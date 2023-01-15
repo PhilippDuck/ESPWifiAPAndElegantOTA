@@ -1,34 +1,22 @@
-/*
-   Copyright (c) 2015, Majenko Technologies
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without modification,
-   are permitted provided that the following conditions are met:
-
- * * Redistributions of source code must retain the above copyright notice, this
-     list of conditions and the following disclaimer.
-
- * * Redistributions in binary form must reproduce the above copyright notice, this
-     list of conditions and the following disclaimer in the documentation and/or
-     other materials provided with the distribution.
-
- * * Neither the name of Majenko Technologies nor the names of its
-     contributors may be used to endorse or promote products derived from
-     this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/* JSON example of user list
+  {
+    "users": [
+      {
+        "name": "Philipp",
+        "uuid": "abb10ea6-c366-40ef-88c4-8bd11cee77b6",
+        "level": 9,
+        "expiryDate": "00-00-0000"
+      },
+      {
+        "name": "Patrick",
+        "uuid": "abb10ea6-c366-40ef-88c4-8bd11cee77b6",
+        "level": 9,
+        "expiryDate": "00-00-0000"
+      }
+    ]
+  }
+  
 */
-
-/* Create a WiFi access point and provide a web server on it. */
 
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
@@ -44,13 +32,27 @@
 /* Set these to your desired credentials. */
 const char *ssid = APSSID;
 const char *password = APPSK;
+const char* PARAM_MESSAGE = "message";
 
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
 /* Just a little test message.  Go to http://192.168.4.1 in a web browser
    connected to this access point to see it.
 */
 
+void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
+
+  if(type == WS_EVT_CONNECT){
+
+    Serial.println("Websocket client connection received");
+    client->text("Hello from ESP32 Server");
+
+  } else if(type == WS_EVT_DISCONNECT){
+    Serial.println("Client disconnected");
+
+  }
+}
 
 void setup() {
   delay(1000);
@@ -66,7 +68,20 @@ void setup() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Hi! This is a sample response and Philipp is cool!");
   });
-  AsyncElegantOTA.begin(&server);    // Start AsyncElegantOTA
+  AsyncElegantOTA.begin(&server, "admin", "password");    // Start AsyncElegantOTA
+
+  server.on("/test", HTTP_GET, [] (AsyncWebServerRequest *request) {
+        String message;
+        if (request->hasParam(PARAM_MESSAGE)) {
+            message = request->getParam(PARAM_MESSAGE)->value();
+        } else {
+            message = "No message sent";
+        }
+        request->send(200, "text/plain", "Hello, GET: " + message);
+    });
+
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
   server.begin();
   Serial.println("HTTP server started");
 }
